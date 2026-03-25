@@ -1,0 +1,16 @@
+README.md
+pyproject.toml
+src/solubility_param_flow/__init__.py
+src/solubility_param_flow/cli.py
+src/solubility_param_flow.egg-info/PKG-INFO
+src/solubility_param_flow.egg-info/SOURCES.txt
+src/solubility_param_flow.egg-info/dependency_links.txt
+src/solubility_param_flow.egg-info/entry_points.txt
+src/solubility_param_flow.egg-info/requires.txt
+src/solubility_param_flow.egg-info/top_level.txt
+src/solubility_param_flow/core/hsp_calculator.py
+src/solubility_param_flow/descriptors/molecular_descriptor.py
+src/solubility_param_flow/models/solubility_predictor.py
+src/solubility_param_flow/workflow/__init__.py
+src/solubility_param_flow/workflow/smiles_to_orca.py
+tests/test_hsp_calculator.py

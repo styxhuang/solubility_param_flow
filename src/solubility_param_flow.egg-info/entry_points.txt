@@ -1,0 +1,2 @@
+[console_scripts]
+spflow = solubility_param_flow.cli:main
