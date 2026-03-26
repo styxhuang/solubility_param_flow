@@ -1,10 +1,11 @@
 """CLI interface for solubility parameter workflow."""
 
 import typer
+from rich import box
 from rich.console import Console
 from rich.table import Table
 
-from solubility_param_flow import HSPCalculator, MolecularDescriptor
+from solubility_param_flow import DescriptorCalculator, HSPCalculator, SmilesToHSPDryRunPipeline
 from solubility_param_flow.workflow import SmilesToOrcaWorkflow
 
 app = typer.Typer(help="Solubility Parameter Calculation Workflow")
@@ -32,7 +33,7 @@ def calculate_hsp(smiles: str, name: str = ""):
 @app.command()
 def descriptors(smiles: str):
     """Calculate molecular descriptors."""
-    calc = MolecularDescriptor()
+    calc = DescriptorCalculator()
     desc = calc.calculate(smiles)
     
     table = Table(title=f"Descriptors for {smiles}")
@@ -47,6 +48,35 @@ def descriptors(smiles: str):
     table.add_row("Rotatable Bonds", str(desc.rotatable_bonds))
     
     console.print(table)
+
+
+@app.command()
+def prepare_dataset(
+    csv_path: str,
+    output_dir: str = "artifacts/hsp_dry_run",
+    smiles_column: str = "smiles",
+    name_column: str = "name",
+):
+    """Run the dry-run CSV -> ORCA/OpenCOSMO-RS -> HSP workflow."""
+    pipeline = SmilesToHSPDryRunPipeline(
+        smiles_column=smiles_column,
+        name_column=name_column,
+    )
+    result_frame = pipeline.run(csv_path, output_dir)
+
+    summary = Table(title="Dry-run HSP Workflow Summary", box=box.SIMPLE_HEAVY)
+    summary.add_column("Metric", style="cyan")
+    summary.add_column("Value", style="magenta")
+    summary.add_row("Input CSV", csv_path)
+    summary.add_row("Output Directory", output_dir)
+    summary.add_row("Total Rows", str(len(result_frame)))
+    summary.add_row("Success", str((result_frame["status"] == "success").sum()))
+    summary.add_row("Invalid SMILES", str((result_frame["status"] == "invalid_smiles").sum()))
+    summary.add_row("Failed", str((result_frame["status"] == "failed").sum()))
+    console.print(summary)
+    console.print(
+        f"Results saved to [bold]{output_dir}/results/hsp_workflow_results.csv[/bold]"
+    )
 
 
 @app.command()

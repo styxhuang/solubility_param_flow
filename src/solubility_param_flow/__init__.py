@@ -5,10 +5,13 @@ __author__ = "styxhuang"
 
 from .core.hsp_calculator import HSPCalculator
 from .core.solubility_predictor import SolubilityPredictor
-from .descriptors.molecular_descriptor import MolecularDescriptor
+from .descriptors.molecular_descriptor import DescriptorCalculator, MolecularDescriptor
+from .pipelines.smiles_pipeline import SmilesToHSPDryRunPipeline
 
 __all__ = [
     "HSPCalculator",
-    "SolubilityPredictor", 
+    "SolubilityPredictor",
     "MolecularDescriptor",
+    "DescriptorCalculator",
+    "SmilesToHSPDryRunPipeline",
 ]
