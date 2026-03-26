@@ -2,28 +2,35 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import List
 
 import pandas as pd
 
 from solubility_param_flow.data import CsvSmilesLoader
-from solubility_param_flow.quantum import DryRunOpenCosmoRunner, DryRunOrcaRunner
-from solubility_param_flow.schemas import PipelineRecord
+from solubility_param_flow.quantum import WorkflowBackendFactory
+from solubility_param_flow.schemas import PipelineRecord, WorkflowExecutionSettings
 
 
 class SmilesToHSPDryRunPipeline:
     """Build workflow artifacts without calling local ORCA or OpenCOSMO-RS."""
 
-    def __init__(
-        self,
-        smiles_column: str = "smiles",
-        name_column: str = "name",
-        orca_binary: str = "/root/orca600/orca",
-    ):
-        self.loader = CsvSmilesLoader(smiles_column=smiles_column, name_column=name_column)
-        self.orca_runner = DryRunOrcaRunner(orca_binary=orca_binary)
-        self.opencosmo_runner = DryRunOpenCosmoRunner()
+    def __init__(self, settings: WorkflowExecutionSettings | None = None, **legacy_kwargs):
+        if settings is None:
+            settings = WorkflowExecutionSettings(
+                smiles_column=legacy_kwargs.get("smiles_column", "smiles"),
+                name_column=legacy_kwargs.get("name_column", "name"),
+            )
+            if "orca_binary" in legacy_kwargs:
+                settings.orca.orca_binary = legacy_kwargs["orca_binary"]
+
+        self.settings = settings
+        self.loader = CsvSmilesLoader(
+            smiles_column=settings.smiles_column,
+            name_column=settings.name_column,
+        )
+        self.orca_runner, self.opencosmo_runner = WorkflowBackendFactory.create(settings)
 
     def run(self, csv_path: str, output_dir: str) -> pd.DataFrame:
         base_dir = Path(output_dir)
@@ -38,6 +45,7 @@ class SmilesToHSPDryRunPipeline:
         valid_frame = pd.DataFrame([record.model_dump() for record in valid_records])
         valid_frame.to_csv(preprocessed_dir / "valid_molecules.csv", index=False)
         invalid_df.to_csv(preprocessed_dir / "invalid_molecules.csv", index=False)
+        self._write_execution_manifest(results_dir / "execution_manifest.json")
 
         outputs: List[PipelineRecord] = []
         for record in valid_records:
@@ -100,6 +108,7 @@ class SmilesToHSPDryRunPipeline:
                     "orca_mode": record.orca.mode,
                     "orca_workdir": record.orca.workdir,
                     "orca_command": record.orca.command,
+                    "remote_submit_command": record.orca.metadata.get("remote_submit_command"),
                     "opt_input_path": record.orca.opt_input_path,
                     "sp_input_path": record.orca.sp_input_path,
                     "cosmo_input_path": record.orca.cosmo_input_path,
@@ -124,3 +133,11 @@ class SmilesToHSPDryRunPipeline:
             )
 
         return flattened
+
+    def _write_execution_manifest(self, target_path: Path) -> None:
+        payload = self.settings.model_dump()
+        payload["notes"] = (
+            "Only dry-run backends are enabled in this phase. "
+            "The ORCA commands and OpenCOSMO-RS reference are persisted for later local execution."
+        )
+        target_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")

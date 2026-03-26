@@ -12,8 +12,21 @@ from solubility_param_flow.schemas import CosmoRsResult, MoleculeRecord, OrcaDry
 class DryRunOrcaRunner:
     """Prepare ORCA input files without executing them."""
 
-    def __init__(self, orca_binary: str = "/root/orca600/orca"):
+    def __init__(
+        self,
+        orca_binary: str = "/root/orca600/orca",
+        allow_run_as_root: bool = True,
+        nprocs: int = 2,
+        remote_image: str = "registry.dp.tech/dptech/orca:6.0.0",
+        remote_machine_type: str = "c2_m8_cpu",
+        remote_project_id: int = 3824565,
+    ):
         self.orca_binary = orca_binary
+        self.allow_run_as_root = allow_run_as_root
+        self.nprocs = nprocs
+        self.remote_image = remote_image
+        self.remote_machine_type = remote_machine_type
+        self.remote_project_id = remote_project_id
 
     def prepare(self, molecule: MoleculeRecord, output_dir: str) -> OrcaDryRunResult:
         workdir = Path(output_dir) / molecule.molecule_id
@@ -26,22 +39,42 @@ class DryRunOrcaRunner:
         output_path = workdir / "orca.out"
 
         self._write_xyz(molecule.canonical_smiles, xyz_path)
-        opt_input_path.write_text(self._build_opt_input(xyz_path), encoding="utf-8")
-        sp_input_path.write_text(self._build_sp_input(), encoding="utf-8")
-        cosmo_input_path.write_text(self._build_cosmo_input(), encoding="utf-8")
+        opt_input_path.write_text(self._build_opt_input(xyz_path, self.nprocs), encoding="utf-8")
+        sp_input_path.write_text(self._build_sp_input(self.nprocs), encoding="utf-8")
+        cosmo_input_path.write_text(self._build_cosmo_input(self.nprocs), encoding="utf-8")
         output_path.write_text(
             "DRY-RUN: ORCA execution skipped.\n"
             "This file documents the expected artifact path for later local execution.\n",
             encoding="utf-8",
         )
 
-        command = (
-            "export OMPI_ALLOW_RUN_AS_ROOT=1 && "
-            "export OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1 && "
+        root_exports = ""
+        if self.allow_run_as_root:
+            root_exports = (
+                "export OMPI_ALLOW_RUN_AS_ROOT=1 && "
+                "export OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1 && "
+            )
+
+        local_command = (
+            f"{root_exports}"
             f"cd {workdir} && "
             f"{self.orca_binary} opt.inp > opt.out 2>&1 && "
             f"{self.orca_binary} sp.inp > sp.out 2>&1 && "
             f"{self.orca_binary} cosmo.inp > cosmo.out 2>&1"
+        )
+        remote_orca_command = (
+            f"{root_exports}cd /data && "
+            f"{self.orca_binary} opt.inp > opt.out 2>&1 && "
+            f"{self.orca_binary} sp.inp > sp.out 2>&1 && "
+            f"{self.orca_binary} cosmo.inp > cosmo.out 2>&1"
+        )
+        remote_submit_command = (
+            "script -q -c "
+            f"\"bohr job submit -m '{self.remote_image}' "
+            f"-t '{self.remote_machine_type}' "
+            f"-c '{remote_orca_command}' -p . "
+            f"--project_id {self.remote_project_id} "
+            f"-n '{molecule.molecule_id}'\" /dev/null"
         )
 
         return OrcaDryRunResult(
@@ -51,11 +84,13 @@ class DryRunOrcaRunner:
             sp_input_path=str(sp_input_path),
             cosmo_input_path=str(cosmo_input_path),
             output_path=str(output_path),
-            command=command,
+            command=local_command,
             metadata={
-                "run_as_root": True,
+                "run_as_root": self.allow_run_as_root,
                 "stages": ["geometry_optimization", "single_point", "cosmo"],
                 "orca_binary": self.orca_binary,
+                "nprocs": self.nprocs,
+                "remote_submit_command": remote_submit_command,
             },
         )
 
@@ -89,13 +124,13 @@ class DryRunOrcaRunner:
         xyz_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
     @staticmethod
-    def _build_opt_input(xyz_path: Path) -> str:
+    def _build_opt_input(xyz_path: Path, nprocs: int) -> str:
         return "\n".join(
             [
                 "! BP86 def2-SVP def2/J OPT",
                 "! RIJCOSX",
                 "",
-                "%pal nprocs 2 end",
+                f"%pal nprocs {nprocs} end",
                 "",
                 f"* xyzfile 0 1 {xyz_path.name}",
                 "",
@@ -103,13 +138,13 @@ class DryRunOrcaRunner:
         )
 
     @staticmethod
-    def _build_sp_input() -> str:
+    def _build_sp_input(nprocs: int) -> str:
         return "\n".join(
             [
                 "! BP86 def2-TZVP def2/J SP",
                 "! RIJCOSX",
                 "",
-                "%pal nprocs 2 end",
+                f"%pal nprocs {nprocs} end",
                 "",
                 "* xyzfile 0 1 opt.xyz",
                 "",
@@ -117,13 +152,13 @@ class DryRunOrcaRunner:
         )
 
     @staticmethod
-    def _build_cosmo_input() -> str:
+    def _build_cosmo_input(nprocs: int) -> str:
         return "\n".join(
             [
                 "! BP86 def2-TZVP def2/J SP CPCM",
                 "! RIJCOSX",
                 "",
-                "%pal nprocs 2 end",
+                f"%pal nprocs {nprocs} end",
                 "",
                 "%cpcm",
                 '  smd true',
@@ -139,8 +174,14 @@ class DryRunOrcaRunner:
 class DryRunOpenCosmoRunner:
     """Generate mock OpenCOSMO-RS outputs for workflow validation."""
 
-    def __init__(self):
+    def __init__(
+        self,
+        python_executable: str = "python",
+        reference_url: str = "https://github.com/TUHH-TVT/openCOSMO-RS_py",
+    ):
         self.descriptor_calculator = DescriptorCalculator()
+        self.python_executable = python_executable
+        self.reference_url = reference_url
 
     def prepare(self, molecule: MoleculeRecord, orca_result: OrcaDryRunResult) -> CosmoRsResult:
         descriptor = self.descriptor_calculator.calculate(molecule.canonical_smiles)
@@ -163,7 +204,8 @@ class DryRunOpenCosmoRunner:
                 "Mock OpenCOSMO-RS output for pipeline validation. "
                 "Replace with real openCOSMO-RS parsing in the local backend."
             ),
-            "reference": "https://github.com/TUHH-TVT/openCOSMO-RS_py",
+            "reference": self.reference_url,
+            "python_executable": self.python_executable,
             "descriptors": {
                 "sigma_moment_2": sigma_moment_2,
                 "sigma_moment_3": sigma_moment_3,

@@ -6,6 +6,7 @@ from rich.console import Console
 from rich.table import Table
 
 from solubility_param_flow import DescriptorCalculator, HSPCalculator, SmilesToHSPDryRunPipeline
+from solubility_param_flow.schemas import WorkflowExecutionSettings
 from solubility_param_flow.workflow import SmilesToOrcaWorkflow
 
 app = typer.Typer(help="Solubility Parameter Calculation Workflow")
@@ -56,12 +57,15 @@ def prepare_dataset(
     output_dir: str = "artifacts/hsp_dry_run",
     smiles_column: str = "smiles",
     name_column: str = "name",
+    orca_binary: str = "/root/orca600/orca",
 ):
     """Run the dry-run CSV -> ORCA/OpenCOSMO-RS -> HSP workflow."""
-    pipeline = SmilesToHSPDryRunPipeline(
+    settings = WorkflowExecutionSettings(
         smiles_column=smiles_column,
         name_column=name_column,
     )
+    settings.orca.orca_binary = orca_binary
+    pipeline = SmilesToHSPDryRunPipeline(settings=settings)
     result_frame = pipeline.run(csv_path, output_dir)
 
     summary = Table(title="Dry-run HSP Workflow Summary", box=box.SIMPLE_HEAVY)

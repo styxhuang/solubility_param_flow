@@ -7,6 +7,7 @@ from .core.hsp_calculator import HSPCalculator
 from .core.solubility_predictor import SolubilityPredictor
 from .descriptors.molecular_descriptor import DescriptorCalculator, MolecularDescriptor
 from .pipelines.smiles_pipeline import SmilesToHSPDryRunPipeline
+from .schemas import WorkflowExecutionSettings
 
 __all__ = [
     "HSPCalculator",
@@ -14,4 +15,5 @@ __all__ = [
     "MolecularDescriptor",
     "DescriptorCalculator",
     "SmilesToHSPDryRunPipeline",
+    "WorkflowExecutionSettings",
 ]
