@@ -12,7 +12,21 @@
 ## 安装
 
 ```bash
-pip install -e .
+uv venv .venv
+source .venv/bin/activate
+uv sync --extra dev --extra md
+```
+
+仓库会提交 `uv.lock`，而本地 `.venv/` 会被 `.gitignore` 忽略。后续推荐优先使用：
+
+```bash
+uv sync --frozen --extra dev --extra md
+```
+
+如果只想直接使用命令，也可以不手动激活环境：
+
+```bash
+uv run spflow --help
 ```
 
 ## 基本用法
@@ -117,6 +131,26 @@ spflow prepare-dataset molecules.csv --output-dir artifacts/hsp_dry_run
 - 结构优化、单点能、`COSMO` 三阶段命令编排
 - `OpenCOSMO-RS` 结果位点和描述符落盘
 - 汇总结果表输出
+
+使用 dry-run 结果表训练传统 `ML` 基线模型，并输出指标和对比图：
+
+```bash
+spflow train-ml artifacts/hsp_dry_run/results/hsp_workflow_results.csv --output-dir artifacts/ml_baseline
+```
+
+默认会比较三组特征：
+
+- `rdkit`
+- `cosmo`
+- `combined`
+
+并输出：
+
+- `metrics_summary.csv`
+- `predictions.csv`
+- `feature_manifest.json`
+- `model_comparison.png`
+- `best_model_scatter.png`
 
 ### 4. 当前实现状态
 
