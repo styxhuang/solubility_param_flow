@@ -116,6 +116,10 @@ class SmilesToHSPDryRunPipeline:
             )
 
         if record.cosmo is not None:
+            rdkit_descriptors = {}
+            if record.cosmo.result_path:
+                result_payload = json.loads(Path(record.cosmo.result_path).read_text(encoding="utf-8"))
+                rdkit_descriptors = result_payload.get("rdkit_descriptors", {})
             flattened.update(
                 {
                     "hsp_source": record.cosmo.hsp_source,
@@ -129,6 +133,16 @@ class SmilesToHSPDryRunPipeline:
                     "hb_donor": record.cosmo.descriptors.get("hb_donor"),
                     "cavity_volume": record.cosmo.descriptors.get("cavity_volume"),
                     "opencosmo_result_path": record.cosmo.result_path,
+                    "mw": rdkit_descriptors.get("mw"),
+                    "logp": rdkit_descriptors.get("logp"),
+                    "tpsa": rdkit_descriptors.get("tpsa"),
+                    "hbd": rdkit_descriptors.get("hbd"),
+                    "hba": rdkit_descriptors.get("hba"),
+                    "rotatable_bonds": rdkit_descriptors.get("rotatable_bonds"),
+                    "fraction_csp3": rdkit_descriptors.get("fraction_csp3"),
+                    "heavy_atom_count": rdkit_descriptors.get("heavy_atom_count"),
+                    "ring_count": rdkit_descriptors.get("ring_count"),
+                    "hetero_atom_count": rdkit_descriptors.get("hetero_atom_count"),
                 }
             )
 

@@ -206,6 +206,15 @@ class DryRunOpenCosmoRunner:
             ),
             "reference": self.reference_url,
             "python_executable": self.python_executable,
+            "rdkit_descriptors": {
+                "mw": descriptor.mw,
+                "logp": descriptor.logp,
+                "tpsa": descriptor.tpsa,
+                "hbd": float(descriptor.hbd),
+                "hba": float(descriptor.hba),
+                "rotatable_bonds": float(descriptor.rotatable_bonds),
+                **descriptor.descriptors,
+            },
             "descriptors": {
                 "sigma_moment_2": sigma_moment_2,
                 "sigma_moment_3": sigma_moment_3,

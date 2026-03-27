@@ -42,6 +42,8 @@ def test_smiles_pipeline_writes_dry_run_artifacts(tmp_path: Path) -> None:
     assert "bohr job submit" in success_row["remote_submit_command"]
     assert success_row["delta_d"] > 0
     assert success_row["sigma_moment_2"] > 0
+    assert success_row["mw"] > 40
+    assert success_row["tpsa"] > 0
 
     invalid_row = result_frame[result_frame["status"] == "invalid_smiles"].iloc[0]
     assert invalid_row["error_message"] == "Invalid SMILES"

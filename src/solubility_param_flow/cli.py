@@ -84,6 +84,44 @@ def prepare_dataset(
 
 
 @app.command()
+def train_ml(
+    dataset_path: str,
+    output_dir: str = "artifacts/ml_baseline",
+    feature_sets: str = "rdkit,cosmo,combined",
+):
+    """Train traditional ML baselines on HSP targets."""
+    from solubility_param_flow.models.hsp_trainer import TraditionalMLTrainer
+
+    trainer = TraditionalMLTrainer()
+    selected_feature_sets = [item.strip() for item in feature_sets.split(",") if item.strip()]
+    metrics = trainer.run_benchmark(
+        dataset_path=dataset_path,
+        output_dir=output_dir,
+        feature_sets=selected_feature_sets,
+    )
+
+    summary = Table(title="Traditional ML Benchmark", box=box.SIMPLE_HEAVY)
+    summary.add_column("Feature Set", style="cyan")
+    summary.add_column("Model", style="green")
+    summary.add_column("MAE", style="magenta")
+    summary.add_column("RMSE", style="magenta")
+    summary.add_column("R2", style="magenta")
+
+    for _, row in metrics.sort_values(["feature_set", "mae"]).iterrows():
+        summary.add_row(
+            str(row["feature_set"]),
+            str(row["model"]),
+            f"{row['mae']:.4f}",
+            f"{row['rmse']:.4f}",
+            f"{row['r2']:.4f}",
+        )
+
+    console.print(summary)
+    console.print(f"Metrics saved to [bold]{output_dir}/metrics_summary.csv[/bold]")
+    console.print(f"Plots saved under [bold]{output_dir}[/bold]")
+
+
+@app.command()
 def predict(solute: str, solvent: str):
     """Predict solubility of solute in solvent."""
     calc = HSPCalculator()
