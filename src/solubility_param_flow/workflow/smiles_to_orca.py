@@ -25,7 +25,7 @@ class OrcaJobConfig:
 class SmilesToOrcaWorkflow:
     """Convert SMILES to ORCA input and submit to Bohrium."""
     
-    def __init__(self, project_id: int = 929872, access_key: Optional[str] = None):
+    def __init__(self, project_id: int = 3824565, access_key: Optional[str] = None):
         self.project_id = project_id
         self.access_key = access_key or os.environ.get("ACCESS_KEY", "")
         self.base_url = "https://openapi.dp.tech/openapi/v1"
@@ -69,26 +69,36 @@ class SmilesToOrcaWorkflow:
             return False
     
     def generate_orca_input(self, config: OrcaJobConfig, xyz_path: str, output_dir: str) -> str:
-        """Generate ORCA input file."""
+        """Generate ORCA input file with geometry optimization."""
         input_file = os.path.join(output_dir, f"{config.molecule_name}.inp")
         
         with open(xyz_path, 'r') as f:
             xyz_lines = f.readlines()[2:]
         
         with open(input_file, 'w') as f:
-            f.write(f"! {config.method} {config.calculation_type}\n")
+            # Use BP86/def2-TZVP with geometry optimization
+            f.write("! BP86 def2-TZVP def2/J OPT FREQ\n")
+            f.write("! RIJCOSX\n")
+            f.write("\n")
+            f.write("%pal nprocs 2 end\n")
+            f.write("\n")
             f.write("* xyz {} {}\n".format(config.charge, config.multiplicity))
             for line in xyz_lines:
                 f.write(line)
             f.write("*\n")
         
         print(f"✓ Generated ORCA input: {input_file}")
+        print(f"  Method: BP86/def2-TZVP with OPT + FREQ")
         return input_file
     
-    def submit_to_bohrium(self, input_dir: str, job_name: str) -> Optional[int]:
+    def submit_to_bohrium(self, input_dir: str, job_name: str, 
+                          image: str = "registry.dp.tech/dptech/prod-13629/orca-xtb:6.0.0_6.7.1",
+                          machine_type: str = "c4_m16_cpu") -> Optional[int]:
         """Submit job to Bohrium using script command."""
         try:
-            cmd = f'''cd {input_dir} && script -q -c "bohr job submit -m 'registry.dp.tech/dptech/prod-13629/orca-xtb:6.0.0_6.7.1' -t 'c4_m15_1' -c 'orca {job_name}.inp > {job_name}.out' -p . --project_id {self.project_id} -n '{job_name}'" /dev/null'''
+            # 使用绝对路径调用 ORCA，并允许 mpirun root 运行
+            orca_cmd = f"export OMPI_ALLOW_RUN_AS_ROOT=1 && export OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1 && cd /data && /root/orca600/orca {job_name}.inp > {job_name}.out 2>&1"
+            cmd = f'''cd {input_dir} && script -q -c "bohr job submit -m '{image}' -t '{machine_type}' -c '{orca_cmd}' -p . --project_id {self.project_id} -n '{job_name}'" /dev/null'''
             
             result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
             output = result.stdout + result.stderr
