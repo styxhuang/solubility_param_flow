@@ -19,11 +19,12 @@ fi
 conda activate "${ENV_PREFIX}"
 
 python -m pip install --upgrade pip
+python -m pip install --upgrade setuptools wheel
 python -m pip install torch joblib rdkit pyyaml addict tqdm matplotlib huggingface_hub seaborn
 python -m pip install numpy==1.22.4 pandas==1.4.0 scikit-learn==1.5.0
 python -m pip install unimol_tools
 
-python -m pip install -U "${PROJECT_ROOT}/lib/unicore"
-python -m pip install -U "${PROJECT_ROOT}"
+python -m pip install -U --no-build-isolation "${PROJECT_ROOT}/lib/unicore"
+python -m pip install -U --no-build-isolation --no-deps "${PROJECT_ROOT}"
 
 echo "uni-elf environment ready at ${ENV_PREFIX}"
