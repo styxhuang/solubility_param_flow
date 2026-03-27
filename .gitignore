@@ -1,14 +1,21 @@
 .venv/
+.conda/
+.python-version
 __pycache__/
 *.py[cod]
 *.pyo
 *.so
+*.egg-info/
+*.egg
+build/
+dist/
 
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
 .coverage
 htmlcov/
+.ipynb_checkpoints/
 
 .DS_Store
 .idea/
@@ -31,7 +38,12 @@ tmp/
 
 *.png
 *.svg
+*.pdf
 
 data/raw/
 data/interim/
 data/processed/
+
+# External model environments and generated manifests
+scripts/*.local.sh
+docs/*.local.md
