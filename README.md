@@ -132,6 +132,50 @@ spflow prepare-dataset molecules.csv --output-dir artifacts/hsp_dry_run
 - `OpenCOSMO-RS` 结果位点和描述符落盘
 - 汇总结果表输出
 
+从 `CSV` 直接生成真实 `ORCA` 批任务目录（`r1/`, `r2/`, ...）与 `run.sh`：
+
+```bash
+spflow prepare-orca-jobs molecules.csv --output-dir artifacts/orca_jobs
+```
+
+这条命令会完成：
+
+- 基于 `SMILES` 的三维构型生成
+- `mol.xyz` 写出
+- `job_opt.inp` / `job_sp.inp` 或 `job.inp` 写出
+- 本地批量执行脚本 `run.sh` 生成
+
+把已经生成好的 `r{i}` 任务目录批量提交到 Bohrium 镜像：
+
+```bash
+spflow submit-orca-jobs artifacts/orca_jobs --project-id 929872
+```
+
+如果希望直接从 `CSV` 生成并提交：
+
+```bash
+spflow submit-orca-csv molecules.csv --jobs-dir artifacts/orca_jobs --project-id 929872
+```
+
+任务结束后，先下载 Bohrium 输出，再把结果拷回本地 `r{i}` 目录：
+
+```bash
+spflow download-orca-results artifacts/orca_jobs/bohrium_submission_manifest.json --completed-only
+spflow stage-orca-results artifacts/orca_jobs/bohrium_submission_manifest.json artifacts/orca_jobs/bohrium_downloads
+```
+
+在 `ORCA` 任务跑完后，把 `r{i}` 目录下的 `.cpcm` 回写到原始 `CSV` 的 `d/p/h/Vm` 列：
+
+```bash
+spflow post-orca molecules.csv artifacts/orca_jobs --backup
+```
+
+如果还要导出 sigma moments 与 profile 描述符：
+
+```bash
+spflow export-sigma artifacts/orca_jobs --csv-path molecules.csv --output-path artifacts/orca_jobs/descriptors.csv
+```
+
 使用 dry-run 结果表训练传统 `ML` 基线模型，并输出指标和对比图：
 
 ```bash
@@ -158,10 +202,39 @@ spflow train-ml artifacts/hsp_dry_run/results/hsp_workflow_results.csv --output-
 spflow prepare-external-models artifacts/hsp_dry_run/results/hsp_workflow_results.csv --output-dir artifacts/external_models
 ```
 
+这条命令现在会生成：
+
+- 上传到 Bohrium 的数据/配置工件
+- `uni-elf` 训练 Python 脚本
+- `Uni-Mol` 训练 Python 脚本
+- 对应的 Bohrium 提交命令与 manifest
+- `Uni-Mol` 默认会使用 `c16_m62_1 * NVIDIA T4`
+- 开启 `job_group` 的 backend 会先建组再提交
+
+外部模型统一提交到镜像：
+
+```text
+registry.dp.tech/dptech/dp/native/prod-13375/unielf:v1.21.0-manual
+```
+
+如果希望生成工件后立即提交：
+
+```bash
+spflow prepare-external-models artifacts/hsp_dry_run/results/hsp_workflow_results.csv --output-dir artifacts/external_models --submit
+```
+
 准备 `uni-elf` 推理清单：
 
 ```bash
 spflow prepare-unielf-inference valid.csv model.pt --config-path artifacts/external_models/unielf/train_config.yaml --scaler-path scaler.pkl --output-dir artifacts/external_models
+```
+
+该命令同样会输出一个 Bohrium 推理提交命令。
+
+如果要生成后直接提交：
+
+```bash
+spflow prepare-unielf-inference valid.csv model.pt --config-path artifacts/external_models/unielf/train_config.yaml --scaler-path scaler.pkl --output-dir artifacts/external_models --submit
 ```
 
 初始化 `uni-elf` 独立环境：
@@ -174,7 +247,13 @@ bash scripts/setup_uni_elf_env.sh
 
 - 本地 HSP 计算流程目前仍是占位实现。
 - ORCA 提交流程已经可以生成输入文件并提交任务。
-- `ORCA -> HSP` 这一步当前使用的是简化经验估算，而不是完整的 COSMO-RS 实现。
+- 已新增 `CSV -> ORCA 任务目录 -> .cpcm 后处理 -> d/p/h/Vm 回写` 主链 CLI。
+- 已新增 `ORCA 任务目录 -> Bohrium 镜像提交 -> 结果下载/回填` 这一层调度能力。
+- 已将 `Uni-Mol/uni-elf` 工件生成改为 Bohrium Python 脚本提交模式。
+- `Uni-Mol` Bohrium 默认机型已切到 `c16_m62_1 * NVIDIA T4`。
+- 外部模型高通量提交已支持 `bohr job_group create` + `bohr job submit -g`。
+- 已新增 sigma descriptors 导出，可作为后续 `ML`/`DL` 特征输入。
+- `ORCA -> HSP` 这一步当前使用的是基于 sigma moments/体积的经验估算，而不是完整的 COSMO-RS 热力学求解。
 - 新增了 `CSV -> dry-run ORCA/OpenCOSMO-RS -> mock HSP/COSMO 描述符` 主链，可用于先验证流程编排。
 - 这个仓库已经具备完整流程骨架，下一步重点是提升各阶段的化学精度。
 
