@@ -6,6 +6,8 @@ __author__ = "styxhuang"
 from .core.hsp_calculator import HSPCalculator
 from .core.solubility_predictor import SolubilityPredictor
 from .descriptors.molecular_descriptor import DescriptorCalculator, MolecularDescriptor
+from .external.config import ExternalModelSettings
+from .external.runners import UniElfRunner, UniMolRunner
 from .models.feature_builder import HSPFeatureBuilder
 from .models.hsp_trainer import TraditionalMLTrainer
 from .pipelines.smiles_pipeline import SmilesToHSPDryRunPipeline
@@ -16,8 +18,11 @@ __all__ = [
     "SolubilityPredictor",
     "MolecularDescriptor",
     "DescriptorCalculator",
+    "ExternalModelSettings",
     "HSPFeatureBuilder",
     "SmilesToHSPDryRunPipeline",
     "TraditionalMLTrainer",
+    "UniElfRunner",
+    "UniMolRunner",
     "WorkflowExecutionSettings",
 ]

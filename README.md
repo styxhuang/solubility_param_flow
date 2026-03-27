@@ -152,6 +152,24 @@ spflow train-ml artifacts/hsp_dry_run/results/hsp_workflow_results.csv --output-
 - `model_comparison.png`
 - `best_model_scatter.png`
 
+准备外部 `Uni-Mol/uni-elf` 调用工件：
+
+```bash
+spflow prepare-external-models artifacts/hsp_dry_run/results/hsp_workflow_results.csv --output-dir artifacts/external_models
+```
+
+准备 `uni-elf` 推理清单：
+
+```bash
+spflow prepare-unielf-inference valid.csv model.pt --config-path artifacts/external_models/unielf/train_config.yaml --scaler-path scaler.pkl --output-dir artifacts/external_models
+```
+
+初始化 `uni-elf` 独立环境：
+
+```bash
+bash scripts/setup_uni_elf_env.sh
+```
+
 ### 4. 当前实现状态
 
 - 本地 HSP 计算流程目前仍是占位实现。

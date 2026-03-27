@@ -1,11 +1,20 @@
 """CLI interface for solubility parameter workflow."""
 
+from pathlib import Path
+
 import typer
 from rich import box
 from rich.console import Console
 from rich.table import Table
 
-from solubility_param_flow import DescriptorCalculator, HSPCalculator, SmilesToHSPDryRunPipeline
+from solubility_param_flow import (
+    DescriptorCalculator,
+    ExternalModelSettings,
+    HSPCalculator,
+    SmilesToHSPDryRunPipeline,
+    UniElfRunner,
+    UniMolRunner,
+)
 from solubility_param_flow.schemas import WorkflowExecutionSettings
 from solubility_param_flow.workflow import SmilesToOrcaWorkflow
 
@@ -119,6 +128,85 @@ def train_ml(
     console.print(summary)
     console.print(f"Metrics saved to [bold]{output_dir}/metrics_summary.csv[/bold]")
     console.print(f"Plots saved under [bold]{output_dir}[/bold]")
+
+
+@app.command()
+def prepare_external_models(
+    dataset_path: str,
+    output_dir: str = "artifacts/external_models",
+    unielf_target: str = "delta_d",
+):
+    """Prepare Uni-Mol and uni-elf command manifests."""
+    settings = ExternalModelSettings()
+    unielf_runner = UniElfRunner(settings=settings)
+    unimol_runner = UniMolRunner(settings=settings)
+
+    unielf_artifacts = unielf_runner.prepare_training_job(
+        dataset_csv=dataset_path,
+        output_dir=output_dir,
+        target_column=unielf_target,
+    )
+    unimol_artifacts = unimol_runner.prepare_training_job(
+        dataset_csv=dataset_path,
+        output_dir=output_dir,
+    )
+
+    summary = Table(title="External Model Artifacts", box=box.SIMPLE_HEAVY)
+    summary.add_column("Backend", style="cyan")
+    summary.add_column("Artifact", style="magenta")
+    summary.add_row("uni-elf", unielf_artifacts["config_path"])
+    summary.add_row("uni-elf", unielf_artifacts["manifest_path"])
+    summary.add_row("Uni-Mol", unimol_artifacts["script_path"])
+    summary.add_row("Uni-Mol", unimol_artifacts["manifest_path"])
+    console.print(summary)
+
+    console.print("\n[bold]uni-elf train command[/bold]")
+    console.print(unielf_artifacts["command"])
+    console.print("\n[bold]Uni-Mol bootstrap command[/bold]")
+    console.print(unimol_artifacts["command"])
+
+
+@app.command()
+def prepare_unielf_inference(
+    dataset_path: str,
+    model_file: str,
+    config_path: str,
+    scaler_path: str = "",
+    output_dir: str = "artifacts/external_models",
+):
+    """Prepare a uni-elf inference command manifest."""
+    settings = ExternalModelSettings()
+    runner = UniElfRunner(settings=settings)
+    artifacts = runner.prepare_inference_job(
+        dataset_csv=dataset_path,
+        model_file=model_file,
+        output_dir=output_dir,
+        config_path=config_path,
+        scaler_path=scaler_path or None,
+    )
+
+    summary = Table(title="uni-elf Inference Manifest", box=box.SIMPLE_HEAVY)
+    summary.add_column("Field", style="cyan")
+    summary.add_column("Value", style="magenta")
+    summary.add_row("Manifest", artifacts["manifest_path"])
+    summary.add_row("Config", config_path)
+    summary.add_row("Model", model_file)
+    summary.add_row("Dataset", dataset_path)
+    console.print(summary)
+    console.print("\n[bold]uni-elf inference command[/bold]")
+    console.print(artifacts["command"])
+
+
+@app.command()
+def show_unielf_setup_script(script_path: str = "scripts/setup_uni_elf_env.sh"):
+    """Show the uni-elf environment bootstrap script path."""
+    resolved = Path(script_path)
+    console.print(f"uni-elf setup script: [bold]{resolved}[/bold]")
+    if resolved.exists():
+        console.print("Run it with:")
+        console.print(f"bash {resolved}")
+    else:
+        console.print("[bold red]Setup script not found[/bold red]")
 
 
 @app.command()
